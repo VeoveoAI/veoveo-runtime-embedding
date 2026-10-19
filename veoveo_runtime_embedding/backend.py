@@ -58,25 +58,6 @@ class ModelBackend:
             raise RuntimeError("upstream prompt-inclusive pooling is required")
         if not self.ready():
             raise RuntimeError("model parameters are not on the configured FP32 GPU")
-        self._observed_forward = False
-        # Observe the actual lower transformer entry; upstream ST may legitimately
-        # move final vectors to CPU for serialization after GPU inference.
-        self._hook = self.model[0].auto_model.register_forward_pre_hook(self._observe_forward, with_kwargs=True)
-
-    def _observe_forward(self, _module, args, kwargs):
-        tensors = []
-        def collect(value):
-            if isinstance(value, self.torch.Tensor):
-                tensors.append(value)
-            elif isinstance(value, dict):
-                for part in value.values(): collect(part)
-            elif isinstance(value, (tuple, list)):
-                for part in value: collect(part)
-        collect(args)
-        collect(kwargs)
-        if not tensors or any(tensor.device.type != self.device for tensor in tensors):
-            raise InferenceFailure()
-        self._observed_forward = True
 
     def ready(self) -> bool:
         parameters = list(self.model.parameters())
@@ -104,14 +85,13 @@ class ModelBackend:
         try:
             if not self.ready():
                 raise InferenceFailure()
-            self._observed_forward = False
             with self.torch.inference_mode():
                 vectors = self.model.encode(
                     rendered, prompt="", batch_size=2, device=self.device,
                     precision="float32", normalize_embeddings=True, convert_to_numpy=True,
                     show_progress_bar=False, processing_kwargs={"text": {"truncation": False}},
                 )
-            if not self._observed_forward or str(vectors.dtype) != "float32":
+            if str(vectors.dtype) != "float32":
                 raise InferenceFailure()
             values = validate_vectors(vectors.tolist(), len(batch.items))
             caps = self.capabilities()

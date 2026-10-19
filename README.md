@@ -27,7 +27,7 @@ export HF_HOME=/var/lib/veoveo/embedding/huggingface
 uv run --frozen --no-sync python -c 'from huggingface_hub import snapshot_download; snapshot_download(repo_id="google/embeddinggemma-2", revision="914f7f89142e33e77833254d9c9b90c3cef7303b")'
 ```
 
-Run prefetch without `HF_HUB_OFFLINE` or `TRANSFORMERS_OFFLINE` set. Serving sets both to `1` and loads the canonical repo/revision with `local_files_only=True`. A missing/incompatible snapshot fails startup; requests cannot trigger a download or choose a path. Record source/image identity and independently hash snapshot files in qualification evidence. A malicious operator modifying the trusted cache is outside this boundary.
+Run prefetch without `HF_HUB_OFFLINE` or `TRANSFORMERS_OFFLINE` set. Serving sets both to `1` and loads the canonical repo/revision with `local_files_only=True`. A missing/incompatible snapshot fails startup; requests cannot trigger a download or choose a path. Record source/image identity and independently hash snapshot files in qualification evidence. Serving checks GPU availability/FP32 parameter placement and explicitly selects the native encode device; actual forward-placement instrumentation belongs to separate qualification probes, without hooks or upstream method wrappers in the serving process. A malicious operator modifying the trusted cache is outside this boundary.
 
 ## Native macOS process
 

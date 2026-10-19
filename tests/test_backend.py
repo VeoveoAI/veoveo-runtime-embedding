@@ -10,7 +10,7 @@ from veoveo_runtime_embedding.backend import ModelBackend
 from veoveo_runtime_embedding.contract import *
 
 class BackendTests(unittest.TestCase):
-    def synthetic(self, counts):
+    def synthetic(self, counts, dtype="float32"):
         backend = ModelBackend.__new__(ModelBackend)
         backend.device, backend.runtime = "mps", {"syntheticFixture": True}
         backend.torch = SimpleNamespace(inference_mode=nullcontext)
@@ -23,13 +23,12 @@ class BackendTests(unittest.TestCase):
             # Every item must have passed token checks before the first model call.
             self.assertEqual(len(counted), len(rendered))
             calls.append((rendered, kwargs))
-            backend._observed_forward = True
             rows = []
             for index, _ in enumerate(rendered):
                 row = [0.0] * DIMENSIONS
                 row[index] = 1.0
                 rows.append(row)
-            return SimpleNamespace(dtype="float32", tolist=lambda: rows)
+            return SimpleNamespace(dtype=dtype, tolist=lambda: rows)
         backend.model = SimpleNamespace(encode=encode)
         backend._count = count
         return backend, calls
@@ -48,7 +47,7 @@ class BackendTests(unittest.TestCase):
             def parameters(self): return [SimpleNamespace(device=SimpleNamespace(type="mps"), dtype=dtype)]
             def __getitem__(self, index):
                 if index == 1: return SimpleNamespace(include_prompt=True)
-                return SimpleNamespace(auto_model=SimpleNamespace(register_forward_pre_hook=lambda *args, **kwargs: object()))
+                raise IndexError(index)
         packages = {"python":"3.14.6", "sentenceTransformers":"6.1.0", "transformers":"5.20.2",
                     "pillow":"13.0.0", "torch":"2.14.1", "torchvision":"0.29.1"}
         torch = SimpleNamespace(float32=dtype, backends=SimpleNamespace(mps=SimpleNamespace(is_available=lambda: True)))
@@ -77,6 +76,8 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         rendered, options = calls[0]
         self.assertEqual(options["batch_size"], 2)
+        self.assertEqual(options["device"], "mps")
+        self.assertEqual(options["precision"], "float32")
         self.assertEqual(options["prompt"], "")
         self.assertFalse(options["processing_kwargs"]["text"]["truncation"])
         self.assertEqual(rendered, [item.render() for item in items])
@@ -85,6 +86,27 @@ class BackendTests(unittest.TestCase):
         for index, item in enumerate(result["items"]):
             self.assertEqual(item["vector"][index], 1.0)
         self.assertEqual(result["usage"]["inputTokens"], 8199)
+
+    def test_readiness_requires_every_parameter_on_selected_fp32_gpu(self):
+        backend = ModelBackend.__new__(ModelBackend)
+        backend.device = "mps"
+        backend.torch = SimpleNamespace(float32="synthetic-float32")
+        def parameter(device="mps", dtype="synthetic-float32"):
+            return SimpleNamespace(device=SimpleNamespace(type=device), dtype=dtype)
+        for parameters, expected in [
+            ([parameter(), parameter()], True),
+            ([], False),
+            ([parameter(), parameter(device="cpu")], False),
+            ([parameter(), parameter(dtype="synthetic-float16")], False),
+        ]:
+            backend.model = SimpleNamespace(parameters=lambda: parameters)
+            self.assertEqual(backend.ready(), expected)
+
+    def test_encode_rejects_non_fp32_output_without_a_forward_hook(self):
+        backend, calls = self.synthetic([1], dtype="float16")
+        with self.assertRaises(InferenceFailure):
+            backend.encode(Batch(uuid7(), (Item("search_query", "synthetic"),)))
+        self.assertEqual(len(calls), 1)
 
     def test_late_overflow_rejects_whole_batch_before_any_model_call(self):
         for counts in ([1, 8193], [8192, 8192, 1]):
