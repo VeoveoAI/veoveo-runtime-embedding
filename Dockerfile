@@ -20,7 +20,11 @@ RUN uv sync --frozen --no-dev --no-install-project --extra model
 FROM model AS runtime
 ARG REVISION=uncommitted
 ENV VEOVEO_EMBEDDING_DEVICE=cuda VEOVEO_EMBEDDING_BIND=0.0.0.0 VEOVEO_EMBEDDING_PORT=8804 VEOVEO_RUNTIME_REVISION=${REVISION} HF_HOME=/var/cache/huggingface
-RUN useradd --system --uid 10001 --no-create-home embedding
+RUN useradd --system --uid 10001 --no-create-home embedding \
+    && install -d -o embedding -g "$(id -gn embedding)" -m 0700 /sandbox
+# Application code stays root-owned; the uninstalled project is imported explicitly.
+ENV PYTHONPATH=/opt/embedding
+WORKDIR /sandbox
 USER embedding
 EXPOSE 8804
 ENTRYPOINT ["/opt/embedding/.venv/bin/python", "-m", "veoveo_runtime_embedding"]

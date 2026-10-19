@@ -63,7 +63,7 @@ After the authorized main merge/push and Mac acceptance, build the private runti
 docker build --platform linux/amd64 --target runtime --build-arg REVISION=<reviewed-commit> -t veoveo-runtime-embedding:0.1.0 .
 ```
 
-The pinned official Python base plus official `torch==2.14.1+cu130` and `torchvision==0.29.1+cu130` wheels supply userspace CUDA dependencies. Native OpenShell CDI supplies approved NVIDIA devices/driver access. No NVIDIA base image, Docker socket or CPU fallback is added. Runtime uses uid 10001; mount the canonical cache read-only at `HF_HOME` and a readable mode-0600 token file. Its `0.0.0.0:8804` listener is for the admitted private container network, never public ingress. Linux/arm64 model startup is unsupported; its base-only check remains supported.
+The pinned official Python base plus official `torch==2.14.1+cu130` and `torchvision==0.29.1+cu130` wheels supply userspace CUDA dependencies. Native OpenShell CDI supplies approved NVIDIA devices/driver access. No NVIDIA base image, Docker socket or CPU fallback is added. Runtime uses uid 10001 with an owned `/sandbox` working directory, satisfying native OpenShell workspace write validation. Application code and the virtual environment stay root-owned under `/opt/embedding`, admitted read-only; `PYTHONPATH=/opt/embedding` locates this uninstalled project from the separate workspace, with the absolute Python entrypoint unchanged. Mount the canonical cache read-only at `HF_HOME` and a readable mode-0600 token file. Its `0.0.0.0:8804` listener is for the admitted private container network, never public ingress. Linux/arm64 model startup is unsupported; its base-only check remains supported.
 
 ## Private protocol
 
