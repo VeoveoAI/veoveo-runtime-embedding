@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>ai.veoveo.runtime.embedding</string>
+<key>ProgramArguments</key><array><string>/usr/local/lib/veoveo-runtime-embedding/.venv/bin/python</string><string>-m</string><string>veoveo_runtime_embedding</string></array>
+<key>WorkingDirectory</key><string>/usr/local/lib/veoveo-runtime-embedding</string>
+<key>EnvironmentVariables</key><dict>
+<key>VEOVEO_RUNTIME_REVISION</key><string>REPLACE_WITH_REVIEWED_40_CHARACTER_SOURCE_COMMIT</string>
+<key>VEOVEO_EMBEDDING_DEVICE</key><string>mps</string>
+<key>VEOVEO_EMBEDDING_BIND</key><string>127.0.0.1</string>
+<key>VEOVEO_EMBEDDING_PORT</key><string>8804</string>
+<key>VEOVEO_EMBEDDING_TOKEN_FILE</key><string>/var/lib/veoveo/embedding/runtime.token</string>
+<key>HF_HOME</key><string>/var/lib/veoveo/embedding/huggingface</string>
+<key>HF_HUB_OFFLINE</key><string>1</string>
+<key>TRANSFORMERS_OFFLINE</key><string>1</string>
+<key>PYTORCH_ENABLE_MPS_FALLBACK</key><string>0</string>
+</dict>
+<key>RunAtLoad</key><true/>
+<key>KeepAlive</key><false/>
+</dict></plist>
