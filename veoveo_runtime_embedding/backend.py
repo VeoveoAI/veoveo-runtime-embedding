@@ -47,7 +47,10 @@ class ModelBackend:
             trust_remote_code=False,
         )
         self.model.float().eval()
-        if self.model.get_sentence_embedding_dimension() != DIMENSIONS or self.model.max_seq_length != MAX_ITEM_TOKENS:
+        # Native tokenizers may advertise an unspecified-length sentinel. The API
+        # enforces actual preprocessed token counts before encode, without changing
+        # model/tokenizer limits or enabling truncation.
+        if self.model.get_sentence_embedding_dimension() != DIMENSIONS:
             raise RuntimeError("cached model does not match the fixed text contract")
         if self.model.prompts.get("query") != SEARCH_PREFIX or self.model.prompts.get("CodeRetrieval") != CODE_PREFIX or self.model.prompts.get("document") != "title: none | text: ":
             raise RuntimeError("cached model prompt contract differs")
