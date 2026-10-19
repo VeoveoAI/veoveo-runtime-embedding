@@ -1,6 +1,8 @@
 # veoveo-runtime-embedding
 
-Private bounded EmbeddingGemma 2 inference behind `veoveo-mcp-embedding`. This implementation candidate has not completed deployed qualification. Upstream prerequisite probes are separate from this service's acceptance. Read [DESIGN.md](DESIGN.md).
+Private bounded EmbeddingGemma 2 inference behind `veoveo-mcp-embedding`, using upstream Sentence Transformers and PyTorch. This component owns GPU execution; the MCP service owns Hub identity, permissions and usage accounting. Read [DESIGN.md](DESIGN.md) for the runtime contract and the [architecture](https://github.com/VeoveoAI/veoveo-docs/blob/main/LORE_OPENSHELL_INTEGRATION.md#embedding-generation) for platform responsibilities.
+
+Measured Mac deployment evidence and the separate Linux CUDA acceptance gates are tracked in the [execution plan](https://github.com/VeoveoAI/veoveo-docs/blob/main/OPENSHELL_HARDCUT_PLAN.md#embedding-generation--2026-10-19). Linux deployed acceptance remains pending; upstream prerequisite probes and synthetic checks remain distinct from deployed service qualification.
 
 The fixed model is `google/embeddinggemma-2@914f7f89142e33e77833254d9c9b90c3cef7303b`. Outputs are ordered, normalized 768-dimensional FP32 vectors. Targets are native macOS/arm64 MPS and Linux/amd64 CUDA 13 through OpenShell CDI. CPU, FP16, user-selected models and truncation are unsupported. No texts/vectors are stored, and there is no search API.
 
