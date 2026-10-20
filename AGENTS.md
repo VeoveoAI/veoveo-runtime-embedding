@@ -8,5 +8,5 @@
 - MCP alone authorizes Artifact references through the Hub. Runtime consumes private resolved signed GETs from its configured storage origin, verifies bounded bytes/size/digest, and uses native loaders. No public URLs, Hub identity, storage credentials, custom sampler, clipping/chunking/aggregation or media persistence. Audio defaults to native truncation=False; explicit truncation is observable.
 - Never persist/log texts, vectors, tokens or arbitrary upstream errors. Return only closed safe error codes; ambiguous execution must remain explicit.
 - Deterministic tests use labelled synthetic fixtures and require no model packages, cache or GPU. Real MPS/CUDA acceptance is a separate measured gate.
-- macOS uses native launchd and loopback; Linux uses native OpenShell Docker CUDA/CDI after main merge. No custom supervisor, OpenShell patches or public model endpoint.
+- macOS uses native launchd and loopback; the Linux reference uses OpenShell's native Kubernetes driver and GPU resource/RuntimeClass selection after main merge. Docker remains image-build/component/qualification tooling. No custom supervisor, OpenShell patches or public model endpoint.
 - Use uv0.13.1 and the reviewed lock. Base Docker check must work on Linux/arm64 and amd64; inference targets are Mac/arm64 and Linux/amd64.
