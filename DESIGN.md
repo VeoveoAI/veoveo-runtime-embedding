@@ -66,6 +66,10 @@ shapes, records actual frame PTS and decoded mono 16 kHz sample counts, and rele
 its decoder buffers. Source metadata is an admission check, not a guarantee against
 all codec/parser resource use on malformed files; source byte bounds and final actual
 shape/sample checks also apply.
+After each validation decode, actual audio samples from explicit audio or video
+soundtracks also count against the aggregate 600-second bound. An underreported
+source duration therefore cannot bypass it; overflow stops subsequent validation
+decodes and prevents token preprocessing or model inference.
 
 The model receives verified **local paths**, never a signed URL. The validation
 decode, native token-preflight decode and native encode decode can therefore each

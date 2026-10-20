@@ -12,7 +12,7 @@ import time
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock,patch
 from uuid import uuid7
 from veoveo_runtime_embedding.contract import *
 from veoveo_runtime_embedding.media import NativeMedia,fetch,resolve,pixels,duration
@@ -125,7 +125,7 @@ class MediaAdmissionTests(unittest.TestCase):
         class Native:
             def inspect(self,part,path,options):
                 events.append("header")
-                return SimpleNamespace(pixels=MAX_TOTAL_PIXELS//2+1,audio_seconds=0,path=path,coverage={})
+                return SimpleNamespace(kind=part.type,pixels=MAX_TOTAL_PIXELS//2+1,audio_seconds=0,path=path,coverage={})
             def validate_decoded(self,*args):events.append("decode")
         with TemporaryDirectory() as directory,patch("veoveo_runtime_embedding.media.fetch",side_effect=lambda s,d,i,o,t:Path(d)/str(i)):
             with self.assertRaisesRegex(Rejected,"media_pixels"):resolve(batch,directory,("http","fixture",80),Native())
@@ -137,7 +137,7 @@ class MediaAdmissionTests(unittest.TestCase):
     def test_resolved_messages_have_explicit_batch_and_safe_source_metadata(self):
         batch=parse_batch(wire([{"content":[{"type":"text","text":"before"},media(),{"type":"text","text":"after"}]}]))
         class Native:
-            def inspect(self,part,path,options):return SimpleNamespace(pixels=1,audio_seconds=0,coverage={"width":1,"height":1,"frameIndex":0})
+            def inspect(self,part,path,options):return SimpleNamespace(kind=part.type,pixels=1,audio_seconds=0,coverage={"width":1,"height":1,"frameIndex":0})
             def validate_decoded(self,*args):pass
         with TemporaryDirectory() as directory,patch("veoveo_runtime_embedding.media.fetch",return_value=Path("/tmp/synthetic-media")):
             conversations,rows=resolve(batch,directory,("http","fixture",80),Native())
@@ -147,5 +147,41 @@ class MediaAdmissionTests(unittest.TestCase):
         self.assertEqual(rows[0][0]["partIndex"],1)
         self.assertNotIn("get",rows[0][0]["source"])
         self.assertNotIn("synthetic-only",str(rows))
+
+    def test_actual_audio_aggregate_stops_decode_before_preflight_or_forward(self):
+        """Synthetic underreported metadata; actual sample counts, no buffers/GPU."""
+        from veoveo_runtime_embedding.backend import ModelBackend
+        for kind in ("audio","video"):
+            for exceed in (False,True):
+                with self.subTest(kind=kind,exceed=exceed):
+                    counts=[300*16000,300*16000]+([1,1] if exceed else [])
+                    events=[]
+                    class Native:
+                        def inspect(self,part,path,options):
+                            coverage={"sourceDurationSeconds":1.0}
+                            if kind=="video":coverage={"audioIncluded":True,"audio":coverage}
+                            return SimpleNamespace(kind=kind,pixels=0,audio_seconds=1.0,coverage=coverage)
+                        def validate_decoded(self,plan,options):
+                            events.append("decode")
+                            coverage=plan.coverage if kind=="audio" else plan.coverage["audio"]
+                            coverage["decodedSamples"]=counts[len(events)-1]
+                    batch=parse_batch(wire([{"content":[media(kind) for _ in counts]}],
+                        preprocessing={"video":{"loadAudioFromVideo":kind=="video"}}))
+                    native=Native()
+                    with patch("veoveo_runtime_embedding.media.fetch",side_effect=lambda s,d,i,o,t:Path(d)/str(i)):
+                        if exceed:
+                            backend=ModelBackend.__new__(ModelBackend)
+                            backend.storage_origin=("http","fixture",80);backend.media=native
+                            backend.model=SimpleNamespace(preprocess=Mock(),encode=Mock())
+                            with self.assertRaisesRegex(Rejected,"media_duration"):backend.encode(batch)
+                            self.assertEqual(events,["decode"]*3,"the fourth source must not decode")
+                            backend.model.preprocess.assert_not_called()
+                            backend.model.encode.assert_not_called()
+                        else:
+                            with TemporaryDirectory() as directory:
+                                _,rows=resolve(batch,directory,("http","fixture",80),native)
+                            self.assertEqual(events,["decode"]*2)
+                            audio=[row["coverage"] if kind=="audio" else row["coverage"]["audio"] for row in rows[0]]
+                            self.assertEqual(sum(value["decodedSamples"] for value in audio),600*16000)
 
 if __name__=="__main__":unittest.main()

@@ -201,5 +201,14 @@ def resolve(batch, directory, origin, native):
         media.append(item_media)
     if sum(plan.pixels for plan in plans) > MAX_TOTAL_PIXELS: raise Rejected("media_pixels")
     if sum(plan.audio_seconds for plan in plans) > MAX_AUDIO_SECONDS: raise Rejected("media_duration")
-    for plan in plans: native.validate_decoded(plan, batch.preprocessing)
+    decoded_samples = 0
+    for plan in plans:
+        native.validate_decoded(plan, batch.preprocessing)
+        # Source metadata admits decoding early; actual decoded samples must also
+        # obey the aggregate bound when a container underreports its duration.
+        audio = plan.coverage if plan.kind == "audio" else plan.coverage.get("audio")
+        if audio is not None:
+            decoded_samples += audio["decodedSamples"]
+            if decoded_samples > MAX_AUDIO_SECONDS * 16000:
+                raise Rejected("media_duration")
     return conversations, media
