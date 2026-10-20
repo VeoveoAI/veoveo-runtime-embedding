@@ -2,9 +2,10 @@
 
 - Read DESIGN.md and README.md. Work only in the assigned worktree; preserve other changes. No subagents or model calls during source iteration. The coordinator owns architecture and rollout; the builder owns full checks, model probes, images and deployment.
 - This component owns private authenticated embedding generation through upstream Sentence Transformers/PyTorch. It does not implement MCP, Hub identity, usage accounting, vector storage/search or a custom scheduler.
-- Fixed model/revision, prompts, normalization and 768 dimensions; FP32 MPS or CUDA only. No CPU fallback, FP16, per-request models or truncation.
+- Fixed full multimodal model/revision; optional request-wide native prompt and 128/256/512/768 dimensions with normalization. FP32 MPS or CUDA inference only; CPU decoding/preprocessing is native, not inference fallback. No per-request model selection.
 - Use the canonical Hugging Face cache and native pinned revision resolution, with operator prefetch outside serving and read-only runtime access. No second model-manifest or download service.
-- Preserve bounded ordered batches, preflight all actual token counts before inference, native encode batch_size=2 and one GPU slot until the actual worker finishes. Caller retry is new computation.
+- Ordered items contain ordered text/image/audio/video parts, each item yielding one vector. Always pass an explicit outer batch of conversations, including N=1; native encode batch_size=1. Preflight all actual token/media bounds before inference and retain one GPU slot and ephemeral media until the actual worker finishes. Caller retry is new computation.
+- MCP alone authorizes Artifact references through the Hub. Runtime consumes private resolved signed GETs from its configured storage origin, verifies bounded bytes/size/digest, and uses native loaders. No public URLs, Hub identity, storage credentials, custom sampler, clipping/chunking/aggregation or media persistence. Audio defaults to native truncation=False; explicit truncation is observable.
 - Never persist/log texts, vectors, tokens or arbitrary upstream errors. Return only closed safe error codes; ambiguous execution must remain explicit.
 - Deterministic tests use labelled synthetic fixtures and require no model packages, cache or GPU. Real MPS/CUDA acceptance is a separate measured gate.
 - macOS uses native launchd and loopback; Linux uses native OpenShell Docker CUDA/CDI after main merge. No custom supervisor, OpenShell patches or public model endpoint.

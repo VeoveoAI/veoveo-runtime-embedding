@@ -10,6 +10,7 @@
 <key>VEOVEO_EMBEDDING_BIND</key><string>127.0.0.1</string>
 <key>VEOVEO_EMBEDDING_PORT</key><string>8804</string>
 <key>VEOVEO_EMBEDDING_TOKEN_FILE</key><string>/var/lib/veoveo/embedding/runtime.token</string>
+<key>VEOVEO_EMBEDDING_STORAGE_ORIGIN</key><string>http://host.openshell.internal:9000</string>
 <key>HF_HOME</key><string>/var/lib/veoveo/embedding/huggingface</string>
 <key>HF_HUB_OFFLINE</key><string>1</string>
 <key>TRANSFORMERS_OFFLINE</key><string>1</string>

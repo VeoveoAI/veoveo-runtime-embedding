@@ -44,7 +44,7 @@ async def request(app, body, token="synthetic-only-bearer", path="/embeddings", 
     return status,raw
 
 def raw_request():
-    return json.dumps({"requestId":str(uuid7()),"items":[{"purpose":"search_query","text":"synthetic"}]}).encode()
+    return json.dumps({"requestId":str(uuid7()),"items":[{"content":[{"type":"text","text":"synthetic"}]}]}).encode()
 
 class AdmissionTests(unittest.IsolatedAsyncioTestCase):
     async def test_timeout_and_cancellation_do_not_release_live_gpu_slot(self):

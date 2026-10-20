@@ -1,0 +1,99 @@
+{
+  "format": "RFC8785/JCS",
+  "generator": "rfc8785==0.1.4",
+  "cases": [
+    {
+      "name": "unicode_integer_fps",
+      "descriptor": {
+        "modelId": "google/embeddinggemma-2",
+        "modelRevision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+        "dimensions": 256,
+        "normalized": true,
+        "pooling": "upstream_mean_projection_normalize",
+        "prompt": "préfixe: 東京 🌊 | ",
+        "preprocessing": {
+          "image": {
+            "maxSoftTokens": 280
+          },
+          "audio": {
+            "truncation": false
+          },
+          "video": {
+            "fps": 1,
+            "maxFrames": 32,
+            "overflowStrategy": "uniform",
+            "maxSoftTokens": 140,
+            "addTimestamps": false,
+            "loadAudioFromVideo": false
+          }
+        },
+        "layout": "ordered_structured_conversations",
+        "audioSamplingRate": 16000
+      },
+      "canonicalUtf8": "{\"audioSamplingRate\":16000,\"dimensions\":256,\"layout\":\"ordered_structured_conversations\",\"modelId\":\"google/embeddinggemma-2\",\"modelRevision\":\"914f7f89142e33e77833254d9c9b90c3cef7303b\",\"normalized\":true,\"pooling\":\"upstream_mean_projection_normalize\",\"preprocessing\":{\"audio\":{\"truncation\":false},\"image\":{\"maxSoftTokens\":280},\"video\":{\"addTimestamps\":false,\"fps\":1,\"loadAudioFromVideo\":false,\"maxFrames\":32,\"maxSoftTokens\":140,\"overflowStrategy\":\"uniform\"}},\"prompt\":\"préfixe: 東京 🌊 | \"}",
+      "sha256": "sha256:4bbe2b5350addbf1322d1c139851dcbee1933d109d5fee5d677686f02fecc42d"
+    },
+    {
+      "name": "unicode_integral_float_fps",
+      "descriptor": {
+        "modelId": "google/embeddinggemma-2",
+        "modelRevision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+        "dimensions": 256,
+        "normalized": true,
+        "pooling": "upstream_mean_projection_normalize",
+        "prompt": "préfixe: 東京 🌊 | ",
+        "preprocessing": {
+          "image": {
+            "maxSoftTokens": 280
+          },
+          "audio": {
+            "truncation": false
+          },
+          "video": {
+            "fps": 1.0,
+            "maxFrames": 32,
+            "overflowStrategy": "uniform",
+            "maxSoftTokens": 140,
+            "addTimestamps": false,
+            "loadAudioFromVideo": false
+          }
+        },
+        "layout": "ordered_structured_conversations",
+        "audioSamplingRate": 16000
+      },
+      "canonicalUtf8": "{\"audioSamplingRate\":16000,\"dimensions\":256,\"layout\":\"ordered_structured_conversations\",\"modelId\":\"google/embeddinggemma-2\",\"modelRevision\":\"914f7f89142e33e77833254d9c9b90c3cef7303b\",\"normalized\":true,\"pooling\":\"upstream_mean_projection_normalize\",\"preprocessing\":{\"audio\":{\"truncation\":false},\"image\":{\"maxSoftTokens\":280},\"video\":{\"addTimestamps\":false,\"fps\":1,\"loadAudioFromVideo\":false,\"maxFrames\":32,\"maxSoftTokens\":140,\"overflowStrategy\":\"uniform\"}},\"prompt\":\"préfixe: 東京 🌊 | \"}",
+      "sha256": "sha256:4bbe2b5350addbf1322d1c139851dcbee1933d109d5fee5d677686f02fecc42d"
+    },
+    {
+      "name": "unicode_fractional_fps",
+      "descriptor": {
+        "modelId": "google/embeddinggemma-2",
+        "modelRevision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+        "dimensions": 256,
+        "normalized": true,
+        "pooling": "upstream_mean_projection_normalize",
+        "prompt": "préfixe: 東京 🌊 | ",
+        "preprocessing": {
+          "image": {
+            "maxSoftTokens": 280
+          },
+          "audio": {
+            "truncation": false
+          },
+          "video": {
+            "fps": 1e-07,
+            "maxFrames": 32,
+            "overflowStrategy": "uniform",
+            "maxSoftTokens": 140,
+            "addTimestamps": false,
+            "loadAudioFromVideo": false
+          }
+        },
+        "layout": "ordered_structured_conversations",
+        "audioSamplingRate": 16000
+      },
+      "canonicalUtf8": "{\"audioSamplingRate\":16000,\"dimensions\":256,\"layout\":\"ordered_structured_conversations\",\"modelId\":\"google/embeddinggemma-2\",\"modelRevision\":\"914f7f89142e33e77833254d9c9b90c3cef7303b\",\"normalized\":true,\"pooling\":\"upstream_mean_projection_normalize\",\"preprocessing\":{\"audio\":{\"truncation\":false},\"image\":{\"maxSoftTokens\":280},\"video\":{\"addTimestamps\":false,\"fps\":1e-7,\"loadAudioFromVideo\":false,\"maxFrames\":32,\"maxSoftTokens\":140,\"overflowStrategy\":\"uniform\"}},\"prompt\":\"préfixe: 東京 🌊 | \"}",
+      "sha256": "sha256:6c68b759165eca7132c97368581b8facedcd82bef16562ce148d93d54ccf432d"
+    }
+  ]
+}

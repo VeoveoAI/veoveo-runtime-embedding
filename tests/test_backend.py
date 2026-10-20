@@ -1,118 +1,179 @@
-"""Synthetic upstream model seam: no torch import, tokenizer or real inference."""
+"""Synthetic native model seam; no torch, decoder or real embeddings."""
 from contextlib import nullcontext
-import sys
-from unittest.mock import patch
-import veoveo_runtime_embedding.backend as backend_module
+from pathlib import Path
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
+import sys
+import asyncio
+import threading
 from uuid import uuid7
+import veoveo_runtime_embedding.backend as module
 from veoveo_runtime_embedding.backend import ModelBackend
 from veoveo_runtime_embedding.contract import *
+from test_contract import wire
+
+
+class Tensor:
+    def __init__(self, count): self.shape, self.count = (1,count), count
+    def sum(self): return SimpleNamespace(item=lambda:self.count)
+
 
 class BackendTests(unittest.TestCase):
-    def synthetic(self, counts, dtype="float32"):
+    def test_startup_keeps_full_towers_native_lengths_and_pinned_gpu(self):
+        dtype=object()
+        sentinel=1000000000000000019884624838656
+        class Model:
+            max_seq_length=sentinel
+            prompts=PROMPTS.copy()
+            def float(self):return self
+            def eval(self):return self
+            def get_sentence_embedding_dimension(self):return 768
+            def parameters(self):return [SimpleNamespace(device=SimpleNamespace(type="mps"),dtype=dtype)]
+            def __getitem__(self,index):
+                if index==1:return SimpleNamespace(include_prompt=True)
+                return SimpleNamespace(auto_model=SimpleNamespace(vision_tower=object(),audio_tower=object()),processor=SimpleNamespace(feature_extractor=SimpleNamespace(sampling_rate=16000)))
+        calls=[]
+        def load(*args,**kwargs):
+            calls.append(kwargs)
+            return Model()
+        packages={"python":"3.14.6","sentenceTransformers":"6.1.0","transformers":"5.20.2","pillow":"13.0.0","torch":"2.14.1","torchvision":"0.29.1","torchcodec":"0.17.0"}
+        torch=SimpleNamespace(float32=dtype,backends=SimpleNamespace(mps=SimpleNamespace(is_available=lambda:True)))
+        with patch.dict(sys.modules,{"torch":torch,"sentence_transformers":SimpleNamespace(SentenceTransformer=load)}), patch.object(module.platform,"system",return_value="Darwin"), patch.object(module.platform,"machine",return_value="arm64"), patch.object(module,"package_identity",return_value=packages), patch.dict(module.os.environ,{"VEOVEO_EMBEDDING_STORAGE_ORIGIN":"http://storage.test:9000","PYTORCH_ENABLE_MPS_FALLBACK":"0"}):
+            loaded=ModelBackend("mps","synthetic-source")
+        self.assertEqual(loaded.model.max_seq_length,sentinel)
+        self.assertNotIn("config_kwargs",calls[0])
+        self.assertTrue(calls[0]["local_files_only"])
+        self.assertEqual(calls[0]["revision"],MODEL_REVISION)
+        self.assertEqual(calls[0]["model_kwargs"],{"dtype":dtype})
+
+    def synthetic(self, counts, dtype="float32", mutate=False):
         backend = ModelBackend.__new__(ModelBackend)
-        backend.device, backend.runtime = "mps", {"syntheticFixture": True}
+        backend.device, backend.runtime = "mps", {"syntheticFixture":True}
+        backend.storage_origin, backend.media = ("http","storage.test",9000), object()
         backend.torch = SimpleNamespace(inference_mode=nullcontext)
-        backend.ready = lambda: True
-        counted, calls = [], []
-        def count(text):
-            counted.append(text)
-            return counts[len(counted) - 1]
-        def encode(rendered, **kwargs):
-            # Every item must have passed token checks before the first model call.
-            self.assertEqual(len(counted), len(rendered))
-            calls.append((rendered, kwargs))
-            rows = []
-            for index, _ in enumerate(rendered):
-                row = [0.0] * DIMENSIONS
-                row[index] = 1.0
+        backend.ready = lambda:True
+        calls, preflight = [], []
+        def preprocess(conversations, **kwargs):
+            # Explicit [conversation] must have one row, regardless of N=1.
+            self.assertEqual(len(conversations),1)
+            self.assertIsInstance(conversations[0],list)
+            self.assertEqual(conversations[0][0]["role"],"user")
+            self.assertFalse(kwargs["processing_kwargs"]["text"]["truncation"])
+            preflight.append(conversations)
+            if mutate: conversations[0][0]["content"].append({"type":"audio"})
+            tensor = Tensor(counts[len(preflight)-1])
+            return {"input_ids":tensor,"attention_mask":tensor}
+        def encode(conversations, **kwargs):
+            self.assertEqual(len(preflight),len(conversations))
+            self.assertTrue(all(len(c)==1 and c[0]["role"]=="user" for c in conversations))
+            self.assertTrue(all(len(c[0]["content"])==1 for c in conversations))
+            calls.append((conversations,kwargs))
+            rows=[]
+            for index in range(len(conversations)):
+                row=[0.0]*kwargs["truncate_dim"]
+                row[index]=1.0
                 rows.append(row)
-            return SimpleNamespace(dtype=dtype, tolist=lambda: rows)
-        backend.model = SimpleNamespace(encode=encode)
-        backend._count = count
-        return backend, calls
+            return SimpleNamespace(dtype=dtype,tolist=lambda:rows)
+        backend.model=SimpleNamespace(encode=encode,preprocess=preprocess)
+        return backend,calls
 
-    def test_startup_accepts_native_unspecified_length_without_changing_it(self):
-        # Synthetic loader/GPU only: this proves startup contract handling, not inference.
-        sentinel = 1000000000000000019884624838656
-        dtype = object()
-        class SyntheticModel:
-            max_seq_length = sentinel
-            tokenizer = SimpleNamespace(model_max_length=sentinel)
-            prompts = {"query": SEARCH_PREFIX, "CodeRetrieval": CODE_PREFIX, "document": "title: none | text: "}
-            def float(self): return self
-            def eval(self): return self
-            def get_sentence_embedding_dimension(self): return self.dimension
-            def parameters(self): return [SimpleNamespace(device=SimpleNamespace(type="mps"), dtype=dtype)]
-            def __getitem__(self, index):
-                if index == 1: return SimpleNamespace(include_prompt=True)
-                raise IndexError(index)
-        packages = {"python":"3.14.6", "sentenceTransformers":"6.1.0", "transformers":"5.20.2",
-                    "pillow":"13.0.0", "torch":"2.14.1", "torchvision":"0.29.1"}
-        torch = SimpleNamespace(float32=dtype, backends=SimpleNamespace(mps=SimpleNamespace(is_available=lambda: True)))
-        for dimension in (DIMENSIONS, DIMENSIONS - 1):
-            model = SyntheticModel()
-            model.dimension = dimension
-            with patch.dict(sys.modules, {"torch": torch, "sentence_transformers": SimpleNamespace(SentenceTransformer=lambda *args, **kwargs: model)}), \
-                    patch.object(backend_module.platform, "system", return_value="Darwin"), \
-                    patch.object(backend_module.platform, "machine", return_value="arm64"), \
-                    patch.object(backend_module, "package_identity", return_value=packages), \
-                    patch.dict(backend_module.os.environ, {"PYTORCH_ENABLE_MPS_FALLBACK":"0"}):
-                if dimension == DIMENSIONS:
-                    loaded = ModelBackend("mps", "synthetic-source")
-                    self.assertTrue(loaded.ready())
-                    self.assertEqual(loaded.model.max_seq_length, sentinel)
-                    self.assertEqual(loaded.model.tokenizer.model_max_length, sentinel)
-                else:
-                    with self.assertRaisesRegex(RuntimeError, "fixed text contract"):
-                        ModelBackend("mps", "synthetic-source")
+    def test_all_preflight_before_native_batch_one_and_no_message_mutation(self):
+        backend,calls=self.synthetic([8192,8192],mutate=True)
+        batch=parse_batch(wire([{"content":[{"type":"text","text":"first"}]},{"content":[{"type":"text","text":"second"}]}],dimensions=256))
+        output=backend.encode(batch)
+        self.assertEqual(len(calls),1)
+        conversations,kwargs=calls[0]
+        self.assertEqual([c[0]["content"][0]["text"] for c in conversations],["first","second"])
+        self.assertEqual(kwargs["batch_size"],1)
+        self.assertEqual(kwargs["device"],"mps")
+        self.assertEqual(kwargs["prompt"],"")
+        self.assertEqual(output["dimensions"],256)
+        self.assertEqual([row["index"] for row in output["items"]],[0,1])
+        self.assertEqual([row["vector"][i] for i,row in enumerate(output["items"])],[1,1])
+        self.assertEqual(output["usage"]["inputTokens"],16384)
+        self.assertNotIn("promptName",output["processing"])
 
-    def test_mixed_lengths_use_native_two_item_microbatches_and_keep_order(self):
-        counts = [8192] + [1] * 7  # synthetic token counts, not real tokenizer evidence
-        backend, calls = self.synthetic(counts)
-        items = (Item("search_query", "synthetic long"),) + tuple(Item("document", f"synthetic short {index}") for index in range(7))
-        result = backend.encode(Batch(uuid7(), items))
-        self.assertEqual(len(calls), 1)
-        rendered, options = calls[0]
-        self.assertEqual(options["batch_size"], 2)
-        self.assertEqual(options["device"], "mps")
-        self.assertEqual(options["precision"], "float32")
-        self.assertEqual(options["prompt"], "")
-        self.assertFalse(options["processing_kwargs"]["text"]["truncation"])
-        self.assertEqual(rendered, [item.render() for item in items])
-        self.assertEqual([item["index"] for item in result["items"]], list(range(8)))
-        self.assertEqual([item["tokenCount"] for item in result["items"]], counts)
-        for index, item in enumerate(result["items"]):
-            self.assertEqual(item["vector"][index], 1.0)
-        self.assertEqual(result["usage"]["inputTokens"], 8199)
+    def test_single_item_is_also_a_batch_of_conversations(self):
+        backend,calls=self.synthetic([10])
+        backend.encode(parse_batch(wire()))
+        self.assertEqual(len(calls[0][0]),1)
+        self.assertIsInstance(calls[0][0][0],list)
 
-    def test_readiness_requires_every_parameter_on_selected_fp32_gpu(self):
-        backend = ModelBackend.__new__(ModelBackend)
-        backend.device = "mps"
-        backend.torch = SimpleNamespace(float32="synthetic-float32")
-        def parameter(device="mps", dtype="synthetic-float32"):
-            return SimpleNamespace(device=SimpleNamespace(type=device), dtype=dtype)
-        for parameters, expected in [
-            ([parameter(), parameter()], True),
-            ([], False),
-            ([parameter(), parameter(device="cpu")], False),
-            ([parameter(), parameter(dtype="synthetic-float16")], False),
-        ]:
-            backend.model = SimpleNamespace(parameters=lambda: parameters)
-            self.assertEqual(backend.ready(), expected)
+    def test_late_overflow_rejects_before_any_inference(self):
+        for counts in ([1,8193],[8192,8192,1]):
+            backend,calls=self.synthetic(counts)
+            batch=parse_batch(wire([{"content":[{"type":"text","text":"synthetic"}]}]*len(counts)))
+            with self.assertRaises(Rejected): backend.encode(batch)
+            self.assertEqual(calls,[])
 
-    def test_encode_rejects_non_fp32_output_without_a_forward_hook(self):
-        backend, calls = self.synthetic([1], dtype="float16")
-        with self.assertRaises(InferenceFailure):
-            backend.encode(Batch(uuid7(), (Item("search_query", "synthetic"),)))
-        self.assertEqual(len(calls), 1)
+    def test_failures_preserve_execution_boundary_and_cleanup_files(self):
+        backend,calls=self.synthetic([1],dtype="float16")
+        captured=[]
+        original=module.resolve
+        def resolved(batch,directory,origin,native):
+            captured.append(Path(directory)/"temporary")
+            captured[-1].write_bytes(b"synthetic transient media")
+            return original(batch,directory,origin,native)
+        with patch.object(module,"resolve",side_effect=resolved):
+            with self.assertRaises(InferenceFailure): backend.encode(parse_batch(wire()))
+        self.assertEqual(len(calls),1)
+        self.assertFalse(captured[0].exists())
+        with patch.object(module,"resolve",side_effect=Rejected("source_digest")):
+            with self.assertRaisesRegex(Rejected,"source_digest"): backend.encode(parse_batch(wire()))
+        with patch.object(module,"resolve",side_effect=ValueError("private details must not echo")):
+            with self.assertRaisesRegex(Rejected,"preprocessing_failed"): backend.encode(parse_batch(wire()))
 
-    def test_late_overflow_rejects_whole_batch_before_any_model_call(self):
-        for counts in ([1, 8193], [8192, 8192, 1]):
-            backend, calls = self.synthetic(counts)
-            items = tuple(Item("code_query", f"synthetic {index}") for index in range(len(counts)))
-            with self.assertRaises(Rejected): backend.encode(Batch(uuid7(), items))
-            self.assertEqual(calls, [])
+    def test_preflight_cardinality_failure_is_confirmed_not_started(self):
+        backend,calls=self.synthetic([1])
+        backend.model.preprocess=lambda *a,**kw:{"input_ids":SimpleNamespace(shape=(2,1)),"attention_mask":Tensor(1)}
+        with self.assertRaisesRegex(Rejected,"preprocessing_cardinality"):backend.encode(parse_batch(wire()))
+        self.assertEqual(calls,[])
 
-if __name__ == "__main__": unittest.main()
+    def test_readiness_requires_all_full_model_parameters_on_fp32_gpu(self):
+        backend=ModelBackend.__new__(ModelBackend)
+        backend.device="mps"
+        backend.torch=SimpleNamespace(float32="fp32")
+        def parameter(device="mps",dtype="fp32"):return SimpleNamespace(device=SimpleNamespace(type=device),dtype=dtype)
+        for values,want in [([parameter(),parameter()],True),([],False),([parameter(),parameter("cpu")],False),([parameter(dtype="fp16")],False)]:
+            backend.model=SimpleNamespace(parameters=lambda:values)
+            self.assertEqual(backend.ready(),want)
+
+class WorkerLifecycleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_temporary_media_and_slot_survive_caller_timeout_and_cancel(self):
+        from veoveo_runtime_embedding.app import Admission
+        backend,_=BackendTests.synthetic(self,[1])
+        started,release=threading.Event(),threading.Event()
+        original_encode=backend.model.encode
+        original_resolve=module.resolve
+        paths=[]
+        def resolved(batch,directory,origin,native):
+            paths.append(Path(directory)/"synthetic-transient-media")
+            paths[-1].write_bytes(b"synthetic fixture")
+            return original_resolve(batch,directory,origin,native)
+        def blocked(*args,**kwargs):
+            started.set()
+            release.wait(2)
+            return original_encode(*args,**kwargs)
+        backend.model.encode=blocked
+        admission=Admission(backend)
+        batch=parse_batch(wire())
+        with patch.object(module,"resolve",side_effect=resolved):
+            worker=admission.submit(batch)
+            try:
+                await asyncio.to_thread(started.wait,1)
+                with self.assertRaises(TimeoutError):await asyncio.wait_for(asyncio.shield(worker),.01)
+                self.assertTrue(paths[0].exists())
+                with self.assertRaises(Rejected):admission.submit(batch)
+                async def caller():return await asyncio.shield(worker)
+                pending=asyncio.create_task(caller())
+                await asyncio.sleep(0)
+                pending.cancel()
+                with self.assertRaises(asyncio.CancelledError):await pending
+                self.assertTrue(paths[0].exists())
+            finally:
+                release.set()
+                await worker
+        self.assertFalse(paths[0].exists())
+
+if __name__ == "__main__":unittest.main()

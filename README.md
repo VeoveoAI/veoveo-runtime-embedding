@@ -2,9 +2,9 @@
 
 Private bounded EmbeddingGemma 2 inference behind `veoveo-mcp-embedding`, using upstream Sentence Transformers and PyTorch. This component owns GPU execution; the MCP service owns Hub identity, permissions and usage accounting. Read [DESIGN.md](DESIGN.md) for the runtime contract and the [architecture](https://github.com/VeoveoAI/veoveo-docs/blob/main/LORE_OPENSHELL_INTEGRATION.md#embedding-generation) for platform responsibilities.
 
-Mac MPS and Linux CUDA deployment qualification passed, including instrumented GPU forwards, real Hub inference, cross-device numerical parity, capacity and restart persistence. The [execution plan](https://github.com/VeoveoAI/veoveo-docs/blob/main/OPENSHELL_HARDCUT_PLAN.md#embedding-generation--2026-10-19) records source identities, measurements and proof limits. Synthetic component tests are reported separately.
+Historical text-only Mac MPS and Linux CUDA deployment qualification passed. The multimodal replacement enables the full model and is being qualified separately; the [execution plan](https://github.com/VeoveoAI/veoveo-docs/blob/main/OPENSHELL_HARDCUT_PLAN.md#multimodal-embedding-replacement--2026-10-19) distinguishes source checks, native probes and deployed evidence. Synthetic component tests do not prove model inference or media quality.
 
-The fixed model is `google/embeddinggemma-2@914f7f89142e33e77833254d9c9b90c3cef7303b`. Outputs are ordered, normalized 768-dimensional FP32 vectors. Targets are native macOS/arm64 MPS and Linux/amd64 CUDA 13 through OpenShell CDI. CPU, FP16, user-selected models and truncation are unsupported. No texts/vectors are stored, and there is no search API.
+The fixed full model is `google/embeddinggemma-2@914f7f89142e33e77833254d9c9b90c3cef7303b`. Ordered text/image/audio/video content produces one normalized FP32 vector per item, jointly embedding all its parts. Dimensions default to 768, with 512/256/128 supported. Targets are native macOS/arm64 MPS and Linux/amd64 CUDA 13 through OpenShell CDI. CPU inference, FP16 and user-selected models are unsupported. Media bytes are verified into temporary files owned by the active worker; no durable texts/media/vectors or search API are added.
 
 ## Media decoding environment
 
@@ -14,7 +14,7 @@ The verified Mac installation uses FFmpeg **8.1.1** through `/opt/homebrew/opt/f
 
 The Docker `model` stage installs Debian trixie's `ffmpeg=7:7.1.5-0+deb13u1`, which supplies FFmpeg 7 shared libraries and the `ffmpeg`/`ffprobe` tools. The base/check stages contain neither FFmpeg nor model dependencies.
 
-Media decoding, audio resampling and video frame sampling are **upstream preprocessing on CPU**. Embedding model inference remains FP32 on explicit MPS/CUDA. Installing these dependencies prepares the environment; the current service API and inference configuration still accept text only. PyAV, librosa and torchaudio are not needed for the selected native TorchCodec path. See [TorchCodec installation guidance](https://github.com/meta-pytorch/torchcodec/blob/v0.17.0/README.md#installing-torchcodec).
+Media decoding, audio resampling and video frame sampling are **upstream preprocessing on CPU**. Embedding model inference remains FP32 on explicit MPS/CUDA. The runtime enables all native towers; MCP public API and deployed qualification remain separate integration steps. PyAV, librosa and torchaudio are not needed for the selected native TorchCodec path. See [TorchCodec installation guidance](https://github.com/meta-pytorch/torchcodec/blob/v0.17.0/README.md#installing-torchcodec).
 
 ## Deterministic checks
 
@@ -53,11 +53,12 @@ Create a random private bearer in a mode-0600 file readable by the runtime user.
 | `VEOVEO_RUNTIME_REVISION` | Reviewed 40-character source commit |
 | `VEOVEO_EMBEDDING_DEVICE` | Explicit `mps` on Mac or `cuda` on Linux |
 | `HF_HOME` | Trusted prefetched canonical cache |
+| `VEOVEO_EMBEDDING_STORAGE_ORIGIN` | Required exact private object-storage origin with explicit port, e.g. `http://host.openshell.internal:9000`; no path/query/credentials |
 | `VEOVEO_EMBEDDING_BIND` | Defaults to `127.0.0.1`; no public listener |
 | `VEOVEO_EMBEDDING_PORT` | Defaults to `8804` |
 
 ```sh
-VEOVEO_EMBEDDING_DEVICE=mps VEOVEO_RUNTIME_REVISION=<reviewed-commit> VEOVEO_EMBEDDING_TOKEN_FILE=<private-file> HF_HOME=<cache-directory> .venv/bin/python -m veoveo_runtime_embedding
+VEOVEO_EMBEDDING_DEVICE=mps VEOVEO_RUNTIME_REVISION=<reviewed-commit> VEOVEO_EMBEDDING_TOKEN_FILE=<private-file> VEOVEO_EMBEDDING_STORAGE_ORIGIN=http://host.openshell.internal:9000 HF_HOME=<cache-directory> .venv/bin/python -m veoveo_runtime_embedding
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/ai.veoveo.runtime.embedding.plist
 launchctl kickstart gui/$(id -u)/ai.veoveo.runtime.embedding
 launchctl bootout gui/$(id -u)/ai.veoveo.runtime.embedding
@@ -79,6 +80,60 @@ The pinned official Python base plus official `torch==2.14.1+cu130` and `torchvi
 
 `GET /livez` is unauthenticated private liveness. `GET /readyz`, `GET /capabilities` and `POST /embeddings` require the fixed bearer. Readiness/capabilities load no model on demand; startup already loaded and verified the fixed GPU model. The MCP client is the public contract/usage boundary.
 
-POST shape: `{requestId: UUIDv7, items: [...]}`. Items use `search_query`/`code_query` with `text`, or `document` with `content` and optional `title`. Unknown members and per-request model settings fail. Limits: 1–8 items, 65,536 total UTF-8 content/title bytes, 8,192 actual tokens/item and 16,384 total tokens including rendered prompts/special tokens. JSON request <=512 KiB; response <=1 MiB. All item/token validation precedes inference. Native `encode(batch_size=2)` bounds padded microbatches while restoring input order.
+POST shape: `{requestId: UUIDv7, items: [{content: [...]}], dimensions?, promptName? | prompt?, preprocessing?}`. Every item has ordered parts and produces one vector. Text parts contain `{type:"text", text}`. Private media parts contain `{type:"image" | "audio" | "video", source:{artifactId,mediaType,size,sha256,get:{method:"GET",url,headers?,expiresAt}}}`. SHA-256 uses `sha256:` followed by 64 lowercase hexadecimal characters. MCP obtains the descriptor through the caller-bound typed Artifact tool; its public API accepts Artifact IDs instead of descriptors. Signed transfers never appear in embedding output.
+
+The runtime always supplies an explicit outer batch of conversations, including N=1. Native encode uses `batch_size=1` with all token/source preflight completed first. Actual token limits are 8,192/item and 16,384/batch, including prompt/special/media tokens. Unknown members, reserved media placeholders in text/prompts and unsupported native controls fail. JSON request <=512 KiB; response <=1 MiB. Complete ordered outputs require the requested dimension, finite FP32 and unit normalization.
+
+Initial service bounds are 8 items, 16 parts/item, 32 parts/batch, 64 KiB text including prompt, 64 MiB/artifact, 128 MiB total transfers, 16 MP/image or frame, 64 MP aggregate selected pixels, 300 seconds/source audio/video and 600 seconds aggregate decoded audio. FPS is at most 120 and frame budget at most 256. These are **our service limits**, subject to deployed validation, not Google model capabilities. Source metadata is checked before decoding; actual selected shape/sample checks follow.
+
+Only the configured storage origin is admitted. HTTPX uses no environment proxy, no redirects and raw bytes, rejects nonidentity Content-Encoding, and enforces a shared 60-second transfer deadline, signed expiry, exact size and SHA-256. Request/transport loggers are suppressed even with root DEBUG enabled. Both successful and failing transfers avoid signed URLs/headers in logs or errors. The worker owns temporary files through caller timeout/disconnection. Native media validation, token preflight and encode can decode a source **three times**; this bounded cost preserves native path-based behavior without a custom processor.
 
 One admitted request owns the GPU slot, including across microbatches. Busy returns 429 immediately. The 60-second deadline returns ambiguous execution; it cannot cancel an already running GPU kernel. The slot remains occupied until the real worker finishes after timeout/disconnect. Responses are whole batches only. Safe closed problem codes mark explicit `not_started` or `unknown`; arbitrary upstream exception text is never returned. No automatic replay occurs.
+
+
+## Native options and coverage
+
+`promptName` accepts `SearchQuery`, `CodeRetrieval`, `Document`, `QuestionAnswering`,
+`FactChecking`, `Classification`, `Clustering` and `SentenceSimilarity`. Alternatively
+pass a literal `prompt`; absent means explicit native empty prompt. Prompts apply once
+per invocation, including multimodal items, not per part. Code is ordinary text.
+
+`preprocessing` accepts only these upstream preprocessing controls:
+
+| Group | Controls and defaults |
+|---|---|
+| `image` | `maxSoftTokens`: 280; choices 70/140/280/560/1120 |
+| `audio` | `truncation`: false; when explicitly true, `maxLength` samples, default 480000 |
+| `video` | `fps`: 1; `maxFrames`: 32; `overflowStrategy`: uniform or truncate; `maxSoftTokens`: 140; `addTimestamps`: false; `loadAudioFromVideo`: false |
+
+Audio uses native mono 16 kHz decoding/resampling. Truncation defaults off so native
+30-second truncation is not silently inherited. Explicit truncation records retained
+samples. Native video soundtrack inclusion fails if no audio track exists and cannot
+be combined with separate audio parts in this initial contract. Image input uses the
+native first frame. Clips, custom longer-media chunking and vector aggregation are
+**optional future application preprocessing/postprocessing suggestions**, excluded here.
+
+Every result includes `index`, `vector`, actual `tokenCount` and `media`, an ordered
+list of resolved source observations. A media row contains `partIndex`, `type`,
+`source:{artifactId,mediaType,size,sha256}` and typed `coverage`:
+
+- Image: `width`, `height`, `frameIndex` (zero).
+- Audio: `sourceDurationSeconds`, `sourceSamplingRate`, `sourceChannels`,
+  `samplingRate` (16000), `decodedSamples`, `retainedSamples`, `truncated`.
+- Video: `sourceDurationSeconds`, `sourceFrameCount`, `sourceFps`, `width`, `height`,
+  `frameIndices`, `frameTimestampsSeconds` (actual TorchCodec PTS),
+  `modelFrameTimestampsSeconds` (native index/FPS prompt values), `audioIncluded`;
+  `audio` contains the audio coverage above when included and is otherwise omitted.
+
+Request-level `processing` contains effective `preprocessing`, `promptSha256`, and
+optional `promptName`; custom prompt text is not echoed. `processingId` is SHA-256 of
+RFC 8785/JCS canonical bytes for the effective fixed model and processing settings,
+including the prompt and dimensions. Python uses `rfc8785==0.1.4`; the Rust adapter
+independently verifies that identity using its native canonicalization library.
+Frozen cross-language vectors live in `tests/fixtures/processing-jcs.json`.
+`runtime.ffmpeg` contains `version` plus `libavfilter`, `libavutil`, `libavcodec` and
+`libavformat` integer version triples; `runtime.torchcodec` identifies its wheel.
+
+Capabilities distinguish these defaults and service limits from native processing
+semantics. Source/token/preprocessing failures are confirmed `not_started`; failures
+after native inference starts remain `unknown`. No partial batch is returned.
