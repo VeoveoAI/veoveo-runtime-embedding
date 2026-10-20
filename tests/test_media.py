@@ -1,7 +1,6 @@
 """Real loopback transfer tests and synthetic metadata/decoder seams; no inference."""
 from contextlib import contextmanager
 from datetime import datetime,timedelta,timezone
-import hashlib
 import io
 import logging
 from pathlib import Path
@@ -34,9 +33,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(302 if case=="/redirect" else 200)
             if case=="/redirect":self.send_header("Location","http://forbidden.invalid/private")
             if case=="/encoding":self.send_header("Content-Encoding","gzip")
-            if case!="/overflow":self.send_header("Content-Length",str(len(BODY)-1 if case=="/length" else len(BODY)))
+            if case not in ("/overflow", "/short"):self.send_header("Content-Length",str(len(BODY)-1 if case=="/length" else len(BODY)))
             self.end_headers()
-            data=BODY+(b"extra" if case=="/overflow" else b"")
+            data=BODY[:-1] if case=="/short" else BODY+(b"extra" if case=="/overflow" else b"")
             if case=="/slow":
                 for byte in data:
                     self.wfile.write(bytes([byte]));self.wfile.flush();time.sleep(.02)
@@ -58,19 +57,17 @@ class TransferTests(unittest.TestCase):
         cls.server.shutdown();cls.server.server_close();cls.thread.join()
     def source(self,case="good",**changes):
         transfer=Transfer(f"http://127.0.0.1:{self.port}/{case}?X-Amz-Signature=synthetic-private",{},datetime.now(timezone.utc)+timedelta(minutes=5))
-        return Source(uuid7(),"image/fixture",len(BODY),"sha256:"+hashlib.sha256(BODY).hexdigest(),transfer,**changes)
-    def test_actual_bytes_digest_redirect_encoding_size_and_expiry(self):
+        return Source(uuid7(),"image/fixture",len(BODY),transfer,**changes)
+    def test_actual_bytes_redirect_encoding_size_and_expiry(self):
         with TemporaryDirectory() as directory:
             source=self.source()
             self.assertEqual(fetch(source,directory,0,self.origin,time.monotonic()+3).read_bytes(),BODY)
-            for index,(case,code) in enumerate((("redirect","source_redirect"),("length","source_size"),("overflow","source_size"),("encoding","source_encoding")),1):
+            for index,(case,code) in enumerate((("redirect","source_redirect"),("length","source_size"),("overflow","source_size"),("short","source_size"),("encoding","source_encoding")),1):
                 with self.subTest(case=case):
                     with self.assertRaisesRegex(Rejected,code):fetch(self.source(case),directory,index,self.origin,time.monotonic()+3)
-            wrong=Source(source.artifact_id,source.media_type,source.size,"sha256:"+"0"*64,source.get)
-            with self.assertRaisesRegex(Rejected,"source_digest"):fetch(wrong,directory,8,self.origin,time.monotonic()+3)
-            expired=Source(source.artifact_id,source.media_type,source.size,source.sha256,Transfer(source.get.url,{},datetime.now(timezone.utc)-timedelta(seconds=1)))
+            expired=Source(source.artifact_id,source.media_type,source.size,Transfer(source.get.url,{},datetime.now(timezone.utc)-timedelta(seconds=1)))
             with self.assertRaisesRegex(Rejected,"source_expired"):fetch(expired,directory,9,self.origin,time.monotonic()+3)
-            badhost=Source(source.artifact_id,source.media_type,source.size,source.sha256,Transfer(source.get.url,{"Host":"forbidden.invalid"},source.get.expires_at))
+            badhost=Source(source.artifact_id,source.media_type,source.size,Transfer(source.get.url,{"Host":"forbidden.invalid"},source.get.expires_at))
             with self.assertRaisesRegex(Rejected,"source_origin"):fetch(badhost,directory,10,self.origin,time.monotonic()+3)
             with self.assertRaisesRegex(Rejected,"source_origin"):fetch(source,directory,11,("http","other.invalid",80),time.monotonic()+3)
     def test_total_deadline_stops_slow_body_and_slow_headers(self):

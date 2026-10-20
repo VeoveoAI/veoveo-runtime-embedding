@@ -1,7 +1,6 @@
 """Private authorized transfers and native media admission. No MCP/Hub identity."""
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-import hashlib
 import logging
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -47,16 +46,14 @@ def fetch(source, directory, index, origin, deadline):
                     length = response.headers.get("content-length")
                     if length is not None and (not length.isdecimal() or int(length) != source.size):
                         raise Rejected("source_size")
-                    read, digest = 0, hashlib.sha256()
+                    read = 0
                     with path.open("xb") as output:
                         async for chunk in response.aiter_raw():
                             if time.monotonic() >= deadline: raise Rejected("source_timeout")
                             read += len(chunk)
                             if read > source.size: raise Rejected("source_size")
-                            digest.update(chunk)
                             output.write(chunk)
                     if read != source.size: raise Rejected("source_size")
-                    if "sha256:" + digest.hexdigest() != source.sha256: raise Rejected("source_digest")
         return path
     try:
         return asyncio.run(transfer())
@@ -181,7 +178,7 @@ class NativeMedia:
 
 
 def resolve(batch, directory, origin, native):
-    """Authorize already happened at MCP. Verify all bytes, admit all headers, then decode."""
+    """Authorize already happened at MCP. Check exact sizes, admit all headers, then decode."""
     import time
     deadline = time.monotonic() + REQUEST_SECONDS
     conversations, media, plans = [], [], []

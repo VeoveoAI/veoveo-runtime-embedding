@@ -92,11 +92,10 @@ class Source:
     artifact_id: UUID
     media_type: str
     size: int
-    sha256: str
     get: Transfer = field(repr=False)
 
     def identity(self):
-        return {"artifactId": str(self.artifact_id), "mediaType": self.media_type, "size": self.size, "sha256": self.sha256}
+        return {"artifactId": str(self.artifact_id), "mediaType": self.media_type, "size": self.size}
 
 @dataclass(frozen=True, slots=True)
 class Part:
@@ -157,14 +156,12 @@ def parse_options(value):
 
 
 def parse_source(value, kind):
-    source = closed(value, ("artifactId", "mediaType", "size", "sha256", "get"))
+    source = closed(value, ("artifactId", "mediaType", "size", "get"))
     media_type = source["mediaType"]
     if (not isinstance(media_type, str) or len(media_type) > 255 or not re.fullmatch(r"[a-zA-Z0-9!#$&^_.+-]+/[a-zA-Z0-9!#$&^_.+-]+", media_type)
             or not media_type.lower().startswith(("audio/", "video/") if kind == "audio" else kind + "/")):
         raise Rejected("invalid_media_type")
     size = positive(source["size"], MAX_ARTIFACT_BYTES)
-    if not isinstance(source["sha256"], str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", source["sha256"]):
-        raise Rejected("invalid_source")
     transfer = closed(source["get"], ("method", "url", "expiresAt"), ("headers",))
     url = transfer["url"]
     try:
@@ -189,7 +186,7 @@ def parse_source(value, kind):
         if (not isinstance(key, str) or not re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+", key)
                 or not isinstance(val, str) or len(val) > 8192 or any(ord(c) < 32 or ord(c) == 127 for c in val)):
             raise Rejected("invalid_source")
-    return Source(uuid_text(source["artifactId"]), media_type, size, source["sha256"], Transfer(url, headers, expires))
+    return Source(uuid_text(source["artifactId"]), media_type, size, Transfer(url, headers, expires))
 
 
 def parse_batch(value):

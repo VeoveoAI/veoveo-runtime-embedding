@@ -16,8 +16,11 @@ content or vectors and performs no search.
 
 A request has ordered `items`; each has ordered `content` parts. Text parts contain
 `type` and `text`. Private media parts contain `type` and a closed `source` descriptor
-with Artifact identity, media type, size, SHA-256 and Artifact's signed GET. Public
-media references remain Artifact IDs; callers cannot supply a runtime URL.
+with Artifact identity, media type, size and Artifact's signed GET. Public
+media references remain Artifact IDs; callers cannot supply a runtime URL. ArtifactID
+and create-only storage identify the bytes; the runtime does not inherit an Artifact
+content-digest requirement. Exact-size, bounded transfer and native decoding admission
+remain mandatory.
 
 Each item becomes one native structured conversation with ordered content. The batch
 is **always** an explicit outer list of conversations, including a single item. One

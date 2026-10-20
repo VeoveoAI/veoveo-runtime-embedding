@@ -84,7 +84,7 @@ Installation owns approved workspace-local cache/token claims and native credent
 
 `GET /livez` is unauthenticated private liveness. `GET /readyz`, `GET /capabilities` and `POST /embeddings` require the fixed bearer. Readiness/capabilities load no model on demand; startup already loaded and verified the fixed GPU model. The MCP client is the public contract/usage boundary.
 
-POST shape: `{requestId: UUIDv7, items: [{content: [...]}], dimensions?, promptName? | prompt?, preprocessing?}`. Every item has ordered parts and produces one vector. Text parts contain `{type:"text", text}`. Private media parts contain `{type:"image" | "audio" | "video", source:{artifactId,mediaType,size,sha256,get:{method:"GET",url,headers?,expiresAt}}}`. SHA-256 uses `sha256:` followed by 64 lowercase hexadecimal characters. MCP obtains the descriptor through the caller-bound typed Artifact tool; its public API accepts Artifact IDs instead of descriptors. Signed transfers never appear in embedding output.
+POST shape: `{requestId: UUIDv7, items: [{content: [...]}], dimensions?, promptName? | prompt?, preprocessing?}`. Every item has ordered parts and produces one vector. Text parts contain `{type:"text", text}`. Private media parts contain `{type:"image" | "audio" | "video", source:{artifactId,mediaType,size,get:{method:"GET",url,headers?,expiresAt}}}`. MCP obtains the descriptor through the caller-bound typed Artifact tool; its public API accepts Artifact IDs instead of descriptors. Signed transfers never appear in embedding output.
 
 The runtime always supplies an explicit outer batch of conversations, including N=1. Native encode uses `batch_size=1` with all token/source preflight completed first. Actual token limits are 8,192/item and 16,384/batch, including prompt/special/media tokens. Unknown members, reserved media placeholders in text/prompts and unsupported native controls fail. JSON request <=512 KiB; response <=1 MiB. Complete ordered outputs require the requested dimension, finite FP32 and unit normalization.
 
@@ -119,7 +119,7 @@ native first frame. Clips, custom longer-media chunking and vector aggregation a
 
 Every result includes `index`, `vector`, actual `tokenCount` and `media`, an ordered
 list of resolved source observations. A media row contains `partIndex`, `type`,
-`source:{artifactId,mediaType,size,sha256}` and typed `coverage`:
+`source:{artifactId,mediaType,size}` and typed `coverage`:
 
 - Image: `width`, `height`, `frameIndex` (zero).
 - Audio: `sourceDurationSeconds`, `sourceSamplingRate`, `sourceChannels`,

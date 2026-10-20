@@ -119,8 +119,8 @@ class BackendTests(unittest.TestCase):
             with self.assertRaises(InferenceFailure): backend.encode(parse_batch(wire()))
         self.assertEqual(len(calls),1)
         self.assertFalse(captured[0].exists())
-        with patch.object(module,"resolve",side_effect=Rejected("source_digest")):
-            with self.assertRaisesRegex(Rejected,"source_digest"): backend.encode(parse_batch(wire()))
+        with patch.object(module,"resolve",side_effect=Rejected("source_size")):
+            with self.assertRaisesRegex(Rejected,"source_size"): backend.encode(parse_batch(wire()))
         with patch.object(module,"resolve",side_effect=ValueError("private details must not echo")):
             with self.assertRaisesRegex(Rejected,"preprocessing_failed"): backend.encode(parse_batch(wire()))
 

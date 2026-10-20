@@ -14,7 +14,7 @@ def wire(items=None, **options):
 
 
 def source(kind="image", **overrides):
-    return {"artifactId": str(uuid7()), "mediaType": kind + "/fixture", "size": 3, "sha256": "sha256:" + "0"*64,
+    return {"artifactId": str(uuid7()), "mediaType": kind + "/fixture", "size": 3,
             "get": {"method": "GET", "url": "http://storage.test:9000/object?signature=synthetic-only",
                     "expiresAt": (datetime.now(timezone.utc)+timedelta(minutes=5)).isoformat()}, **overrides}
 
@@ -32,6 +32,14 @@ class ContractTests(unittest.TestCase):
         self.assertFalse(batch.preprocessing["audio"]["truncation"])
         self.assertNotIn("signature", repr(batch))
         self.assertNotIn("first", repr(batch))
+
+    def test_artifact_source_identity_has_no_content_digest(self):
+        value = source()
+        parsed = parse_source(value, "image")
+        self.assertEqual(parsed.identity(), {key: value[key] for key in ("artifactId", "mediaType", "size")})
+        value["sha256"] = "sha256:" + "0"*64
+        with self.assertRaises(Rejected):
+            parse_source(value, "image")
 
     def test_dimensions_prompts_and_effective_processing_identity(self):
         base = parse_batch(wire())
