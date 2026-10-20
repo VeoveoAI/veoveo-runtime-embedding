@@ -811,6 +811,30 @@ wheels = [
 ]
 
 [[package]]
+name = "torchcodec"
+version = "0.17.0"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "platform_machine == 'arm64' and sys_platform == 'darwin'",
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c7/e0/78fd92b246cc0a9a0800306d82a743ec990105310595b68698061964574e/torchcodec-0.17.0-cp314-cp314-macosx_14_0_arm64.whl", hash = "sha256:9567427ba28cee36704104f66bbaebfc210b89204fceb3063ca09a3fdeb0ac02", size = 4220040, upload-time = "2026-09-30T12:53:10.152Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/38/e27754be64b351b99d16e146c27fe1c8ef0abdd92186d33282afbf81801e/torchcodec-0.17.0-cp314-cp314t-macosx_14_0_arm64.whl", hash = "sha256:7c6004dbeb27a9e58bad0b3d10b4d7f7cda4407c0f10ba45a5a2ebd60aa33dbe", size = 4223965, upload-time = "2026-09-30T12:53:17.46Z" },
+]
+
+[[package]]
+name = "torchcodec"
+version = "0.17.0+cpu"
+source = { registry = "https://download.pytorch.org/whl/cpu" }
+resolution-markers = [
+    "platform_machine == 'x86_64' and sys_platform == 'linux'",
+]
+wheels = [
+    { url = "https://download.pytorch.org/whl/cpu/torchcodec-0.17.0%2Bcpu-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f4974d75c339e71f6c57af96cc25379307e7d9f1422894acedcb39a2a9e67e6a", upload-time = "2026-09-30T16:55:36Z" },
+    { url = "https://download.pytorch.org/whl/cpu/torchcodec-0.17.0%2Bcpu-cp314-cp314t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6fbf462c74dfa04d775f488b42280240e5d6594691b2ed10234825728018fc01", upload-time = "2026-09-30T16:55:36Z" },
+]
+
+[[package]]
 name = "torchvision"
 version = "0.29.1"
 source = { registry = "https://pypi.org/simple" }
@@ -945,6 +969,8 @@ model = [
     { name = "sentence-transformers", marker = "platform_machine == 'x86_64' or sys_platform != 'linux'" },
     { name = "torch", version = "2.14.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.14.1+cu130", source = { registry = "https://download.pytorch.org/whl/cu130" }, marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
+    { name = "torchcodec", version = "0.17.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
+    { name = "torchcodec", version = "0.17.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "torchvision", version = "0.29.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torchvision", version = "0.29.1+cu130", source = { registry = "https://download.pytorch.org/whl/cu130" }, marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "transformers", marker = "platform_machine == 'x86_64' or sys_platform != 'linux'" },
@@ -957,6 +983,8 @@ requires-dist = [
     { name = "sentence-transformers", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'model') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'model')", specifier = "==6.1.0" },
     { name = "torch", marker = "platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'model'", specifier = "==2.14.1" },
     { name = "torch", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'model'", specifier = "==2.14.1+cu130", index = "https://download.pytorch.org/whl/cu130" },
+    { name = "torchcodec", marker = "platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'model'", specifier = "==0.17.0" },
+    { name = "torchcodec", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'model'", specifier = "==0.17.0+cpu", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torchvision", marker = "platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'model'", specifier = "==0.29.1" },
     { name = "torchvision", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'model'", specifier = "==0.29.1+cu130", index = "https://download.pytorch.org/whl/cu130" },
     { name = "transformers", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'model') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'model')", specifier = "==5.20.2" },

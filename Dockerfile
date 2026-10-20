@@ -14,6 +14,10 @@ COPY tests ./tests
 RUN uv run --frozen --no-sync python -m unittest discover -s tests -v
 
 FROM base AS model
+# Native upstream media decoding uses FFmpeg shared libraries on CPU; model inference stays CUDA.
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y ffmpeg=7:7.1.5-0+deb13u1 \
+    && rm -rf /var/lib/apt/lists/*
 # Production Linux/amd64 resolves the official +cu130 wheels from the explicit index.
 RUN uv sync --frozen --no-dev --no-install-project --extra model
 

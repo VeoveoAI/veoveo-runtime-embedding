@@ -6,6 +6,16 @@ Mac MPS and Linux CUDA deployment qualification passed, including instrumented G
 
 The fixed model is `google/embeddinggemma-2@914f7f89142e33e77833254d9c9b90c3cef7303b`. Outputs are ordered, normalized 768-dimensional FP32 vectors. Targets are native macOS/arm64 MPS and Linux/amd64 CUDA 13 through OpenShell CDI. CPU, FP16, user-selected models and truncation are unsupported. No texts/vectors are stored, and there is no search API.
 
+## Media decoding environment
+
+The `model` extra also installs TorchCodec **0.17.0** on macOS/arm64 and the official **0.17.0+cpu** wheel on Linux/amd64. Hugging Face's native loaders use it for audio/video decoding. They require FFmpeg shared libraries discoverable by the native loader.
+
+The verified Mac installation uses FFmpeg **8.1.1** through `/opt/homebrew/opt/ffmpeg/lib`, resolving to `/opt/homebrew/Cellar/ffmpeg/8.1.1/lib`. The TorchCodec 0.17.0 Mac wheel's FFmpeg 8 library has an `LC_RPATH` of `/opt/homebrew/opt/ffmpeg/lib`; real decoding loaded those libraries with no `DYLD_*` environment settings. Homebrew's versioned `ffmpeg@8` formula is keg-only: installing it alone does not establish this library-discovery arrangement, and that installation was not tested here.
+
+The Docker `model` stage installs Debian trixie's `ffmpeg=7:7.1.5-0+deb13u1`, which supplies FFmpeg 7 shared libraries and the `ffmpeg`/`ffprobe` tools. The base/check stages contain neither FFmpeg nor model dependencies.
+
+Media decoding, audio resampling and video frame sampling are **upstream preprocessing on CPU**. Embedding model inference remains FP32 on explicit MPS/CUDA. Installing these dependencies prepares the environment; the current service API and inference configuration still accept text only. PyAV, librosa and torchaudio are not needed for the selected native TorchCodec path. See [TorchCodec installation guidance](https://github.com/meta-pytorch/torchcodec/blob/v0.17.0/README.md#installing-torchcodec).
+
 ## Deterministic checks
 
 Use uv **0.13.1** and Python **3.14.6**. The checked-in lock pins packages and their selected indexes. Base dependencies contain no model packages; these checks perform no model inference or downloads:
