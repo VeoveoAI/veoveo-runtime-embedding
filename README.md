@@ -74,6 +74,8 @@ After the authorized main merge/push and Mac acceptance, build the private runti
 docker build --platform linux/amd64 --target runtime --build-arg REVISION=<reviewed-commit> -t veoveo-runtime-embedding:0.1.0 .
 ```
 
+Both frozen `uv sync` layers use [BuildKit cache mounts](https://docs.astral.sh/uv/guides/integration/docker/#caching), keeping downloaded wheels outside the shipped image while `UV_LINK_MODE=copy` installs its virtual environment.
+
 The pinned official Python base plus official `torch==2.14.1+cu130` and `torchvision==0.29.1+cu130` wheels supply userspace CUDA dependencies. The Linux reference uses OpenShell's native Kubernetes driver with a one-GPU resource request, NVIDIA device plugin and selected `nvidia` RuntimeClass. Docker remains image-build/component/qualification tooling. No NVIDIA base image, Docker socket or CPU fallback is added.
 
 The standalone image retains uid 10001 and its owned, empty mode-0700 `/sandbox` working directory. The reference gateway's selected native service uid/gid is 10001:10001, so its workspace helper can enumerate that image seed as the owner. Use the effective gateway/workspace identity, not the gateway Pod's own user or unused chart values, when preparing mounts. Actual private workspace contents belong to the OpenShell-owned PVC mounted at `/sandbox`, with native ownership; they are not stored in the image seed. Application code and the virtual environment stay root-owned under `/opt/embedding`, admitted read-only; `PYTHONPATH=/opt/embedding` locates this uninstalled project from the separate workspace, with the absolute Python entrypoint unchanged.

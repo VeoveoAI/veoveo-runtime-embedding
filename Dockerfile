@@ -5,7 +5,8 @@ COPY --from=uv /uv /uvx /usr/local/bin/
 WORKDIR /opt/embedding
 ENV UV_LINK_MODE=copy PYTHONUNBUFFERED=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTORCH_ENABLE_MPS_FALLBACK=0
 COPY pyproject.toml uv.lock .python-version ./
-RUN uv sync --frozen --no-dev --no-install-project
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
 COPY veoveo_runtime_embedding ./veoveo_runtime_embedding
 
 FROM base AS check
@@ -19,7 +20,8 @@ RUN apt-get update \
     && apt-get install --no-install-recommends -y ffmpeg=7:7.1.5-0+deb13u1 \
     && rm -rf /var/lib/apt/lists/*
 # Production Linux/amd64 resolves the official +cu130 wheels from the explicit index.
-RUN uv sync --frozen --no-dev --no-install-project --extra model
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project --extra model
 
 FROM model AS runtime
 ARG REVISION=uncommitted
