@@ -1,6 +1,7 @@
 # Runtime ownership
 
 - Read DESIGN.md and README.md. Work only in the assigned worktree; preserve other changes. No subagents or model calls during source iteration. The coordinator owns architecture and rollout; the builder owns full checks, model probes, images and deployment.
+- The design is in [DESIGN.md](DESIGN.md). Change it in the same change as the code.
 - This component owns private authenticated embedding generation through upstream Sentence Transformers/PyTorch. It does not implement MCP, Hub identity, usage accounting, vector storage/search or a custom scheduler.
 - Fixed full multimodal model/revision; optional request-wide native prompt and 128/256/512/768 dimensions with normalization. FP32 MPS or CUDA inference only; CPU decoding/preprocessing is native, not inference fallback. No per-request model selection.
 - Use the canonical Hugging Face cache and native pinned revision resolution, with operator prefetch outside serving and read-only runtime access. No second model-manifest or download service.
