@@ -99,7 +99,7 @@ quality guarantees: 8 items; 16 parts/item and 32 parts/batch; 64 KiB text inclu
 prompt; 64 MiB/artifact and 128 MiB total transfers; 16 megapixels/image or frame and
 64 megapixels total selected images/frames; 300 seconds/source audio or video and
 600 seconds aggregate decoded audio; FPS at most 120 and frame budget at most 256.
-These defensive initial limits require deployed capacity qualification.
+These are defensive limits.
 
 Native untruncated preprocessing includes special tokens and multimodal placeholders.
 Each item must have exactly one preflight row, at most 8192 actual tokens; the batch
