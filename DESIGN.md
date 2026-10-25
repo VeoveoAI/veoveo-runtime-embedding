@@ -114,13 +114,12 @@ outcomes. HTTP timeout/cancellation shields the actual worker; the one GPU slot 
 TemporaryDirectory remain owned until that worker finishes. A retry is new work.
 There is no queue, replay, GPU-kernel cancellation promise or durable Task here.
 
-## Environment and evidence
+## Environment and verification
 
 Startup resolves the exact canonical Hugging Face cache offline, checks pinned package
 identities, full towers, prompt/pooling contract, GPU availability and every parameter's
 FP32 placement. Runtime reports TorchCodec and actual linked FFmpeg library versions.
-No forward hooks or wrappers are installed in serving; actual GPU-forward observations
-belong to separate qualification probes.
+No forward hooks or wrappers are installed in serving.
 
 TorchCodec 0.17.0 runs on Mac arm64; Linux AMD64 uses the official 0.17.0+cpu decoder
 with CUDA 13 inference wheels. FFmpeg shared libraries are required. Docker's model
@@ -130,6 +129,4 @@ ARM64. Mac's verified installation and library discovery are documented in READM
 Deterministic tests use labeled synthetic counts/vectors/decoder seams and real
 loopback HTTP transfer fixtures. They prove contract, admission, integrity, timeout,
 cleanup and delegation-free runtime boundaries; they do not prove model inference,
-media semantic quality or encoding validity of their synthetic transfer bytes. Full
-model MPS/CUDA and deployed Hub qualification are distinct measured gates. Historical
-text-only deployment evidence does not qualify this replacement.
+media semantic quality or encoding validity of their synthetic transfer bytes.
